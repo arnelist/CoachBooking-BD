@@ -8,6 +8,7 @@ import Select from "../components/Select";
 import { createTimeslot, deletePastFreeSlots, deleteTimeslot } from "../services/timeslots";
 import { getNextDays, minutesToTime, timeToMinutes } from "../utils/dates";
 import { authErrorMessage } from "../utils/authErrors";
+import { toDate } from "../utils/dates";
 
 const DAYS_AHEAD = 7;
 const FIRST_START = 6 * 60;
@@ -93,6 +94,14 @@ export default function TrainerScheduleScreen() {
         setError("");
         if (!startTime) {
             setError("Choose a start time.");
+            return;
+        }
+        if (toDate(selectedDay, startTime) <= new Date()) {
+            setError("This start time has already passed.");
+            return;
+        }
+        if (timeToMinutes(startTime) + duration >= 24 * 60) {
+            setError("The slot must end before midnight.");
             return;
         }
         if (overlaps(slots, startTime, endTime)) {

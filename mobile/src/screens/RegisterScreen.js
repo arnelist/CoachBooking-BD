@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, ScrollView } from 'react-native';
+import { Text, TextInput, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, ScrollView } from 'react-native';
 import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
@@ -54,7 +54,7 @@ export default function RegisterScreen({ navigation }) {
 
     return (
         <KeyboardAvoidingView
-            style={styles.container}
+            style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
@@ -126,30 +126,9 @@ export default function RegisterScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flexGrow: 1, justifyContent: "center", padding: 24, gap: 12 },
   title: { fontSize: 26, fontWeight: "700", textAlign: "center" },
-
-  progress: { gap: 8, marginBottom: 8 },
-  bars: { flexDirection: "row", gap: 6 },
-  bar: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "#e5e7eb" },
-  barActive: { backgroundColor: "#111827" },
-
   input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 12, fontSize: 16 },
-  multiline: { minHeight: 90, textAlignVertical: "top" },
-  label: { fontWeight: "600", marginTop: 4 },
-  muted: { color: "#6b7280" },
-
-  option: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 12, gap: 2 },
-  optionSelected: { borderColor: "#111827", backgroundColor: "#111827" },
-  optionTitle: { fontSize: 16, fontWeight: "600" },
-  textOnDark: { color: "#fff" },
-
   error: { color: "#dc2626" },
-
-  buttonRow: { flexDirection: "row", gap: 12, marginTop: 8 },
   button: { padding: 14, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#111827" },
-  buttonPrimary: { flex: 1, backgroundColor: "#111827" },
-  buttonSecondary: { borderWidth: 1, borderColor: "#111827", paddingHorizontal: 20 },
   buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-  buttonSecondaryText: { color: "#111827", fontWeight: "600", fontSize: 16 },
-
   link: { textAlign: "center", color: "#2563eb", marginTop: 8 },
 });

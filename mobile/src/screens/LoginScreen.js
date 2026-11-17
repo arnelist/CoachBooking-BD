@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { Text, TextInput, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { authErrorMessage } from '../utils/authErrors';
@@ -17,7 +17,7 @@ export default function LoginScreen({ navigation }) {
             setError('Please fill in all fields');
             return;
         }
-        
+
         setLoading(true);
         try {
             await signInWithEmailAndPassword(auth, email.trim(), password);
