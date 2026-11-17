@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   error: { color: "#dc2626" },
 
   buttonRow: { flexDirection: "row", gap: 12, marginTop: 8 },
-  button: { padding: 14, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  button: { padding: 14, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#111827" },
   buttonPrimary: { flex: 1, backgroundColor: "#111827" },
   buttonSecondary: { borderWidth: 1, borderColor: "#111827", paddingHorizontal: 20 },
   buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
