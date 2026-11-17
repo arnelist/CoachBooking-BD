@@ -13,7 +13,7 @@ service cloud.firestore {
       allow create: if isSelf(uid)
         && request.resource.data.role in ["client", "trainer"]
         && request.resource.data.email == request.auth.token.email;
-      allow update: if isSelf(uid)
+      allow update: if (isSelf(uid) || isAdmin())
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["firstName", "lastName", "updatedAt"]);
       allow delete: if false;
     }
