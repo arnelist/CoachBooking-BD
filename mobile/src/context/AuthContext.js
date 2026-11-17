@@ -21,18 +21,29 @@ export function AuthProvider({ children }) {
             return;
         }
         setProfile(undefined);
-        return onSnapshot(
-            doc(db, 'users', user.uid), 
-            (snap) => setProfile(snap.exists() ? { id: snap.id, ...snap.data() } : null),
-            (error) => {
-                console.log('Error fetching profile:', error.code);
-                setProfile(null);
-            }
-        );
+
+        let unsubscribe = () => {};
+        let retryTimer = null;
+
+        function listen(attempt) {
+            unsubscribe = onSnapshot(
+                doc(db, "users", user.uid),
+                (snap) => setProfile(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+                (error) => {
+                    console.log("Error fetching profile: ", error.code);
+                    if (attempt < 3) retryTimer = setTimeout(() => listen(attempt + 1), 1000);
+                }
+            );
+        }
+
+        listen(1);
+        return () => {
+            unsubscribe();
+            clearTimeout(retryTimer);
+        };
     }, [user]);
 
     //trainer state
-
     const isTrainer = profile?.role === "trainer";
 
     useEffect(() => {

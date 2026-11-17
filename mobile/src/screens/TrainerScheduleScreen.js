@@ -6,9 +6,9 @@ import { db } from "../services/firebase";
 import { useAuth } from "../context/AuthContext";
 import Select from "../components/Select";
 import { createTimeslot, deletePastFreeSlots, deleteTimeslot } from "../services/timeslots";
-import { getNextDays, minutesToTime, timeToMinutes } from "../utils/dates";
+import { getNextDays, minutesToTime, timeToMinutes, toDate } from "../utils/dates";
 import { authErrorMessage } from "../utils/authErrors";
-import { toDate } from "../utils/dates";
+import DayPicker from "../components/DayPicker";
 
 const DAYS_AHEAD = 7;
 const FIRST_START = 6 * 60;
@@ -144,22 +144,7 @@ export default function TrainerScheduleScreen() {
 
     return (
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-            <View style={styles.days}>
-                {days.map((d) => {
-                const active = d.key === selectedDay;
-                return (
-                    <Pressable
-                    key={d.key}
-                    onPress={() => selectDay(d.key)}
-                    style={[styles.day, active && styles.dayActive]}
-                    >
-                    <Text style={[styles.dayWeek, active && styles.textOnDark]}>{d.weekday}</Text>
-                    <Text style={[styles.dayNumber, active && styles.textOnDark]}>{d.day}</Text>
-                    <Text style={[styles.dayMonth, active && styles.textOnDark]}>{d.month}</Text>
-                    </Pressable>
-                );
-                })}
-            </View>
+            <DayPicker days={days} value={selectedDay} onChange={selectDay} />
 
             <View style={styles.card}>
                 <Text style={styles.sectionTitle}>Add a slot</Text>
@@ -221,23 +206,6 @@ export default function TrainerScheduleScreen() {
 
 const styles = StyleSheet.create({
     container: { padding: 16, gap: 12 },
-
-    days: { flexDirection: "row", gap: 6 },
-    day: {
-        flex: 1,
-        alignItems: "center",
-        paddingVertical: 8,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: "#e5e7eb",
-        backgroundColor: "#fff",
-    },
-    dayActive: { backgroundColor: "#111827", borderColor: "#111827" },
-    dayWeek: { fontSize: 12, color: "#6b7280" },
-    dayNumber: { fontSize: 18, fontWeight: "700", color: "#111827" },
-    dayMonth: { fontSize: 11, color: "#6b7280" },
-    textOnDark: { color: "#fff" },
-
     card: {
         backgroundColor: "#fff",
         borderRadius: 10,

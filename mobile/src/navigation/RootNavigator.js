@@ -6,7 +6,7 @@ import LoadingScreen from '../screens/LoadingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import TrainerRegisterScreen from '../screens/TrainerRegisterScreen';
-import ClientHomeScreen from '../screens/ClientHomeScreen';
+import ClientTabs from './ClientTabs';
 import TrainerStatusScreen from '../screens/TrainerStatusScreen';
 import UnsupportedRoleScreen from '../screens/UnsupportedRoleScreen';
 import TrainerTabs from './TrainerTabs';
@@ -46,7 +46,7 @@ export default function RootNavigator() {
                 )}
 
                 {mode === "client" && (
-                    <Stack.Screen name="ClientHome" component={ClientHomeScreen} />
+                    <Stack.Screen name="ClientApp" component={ClientTabs} />
                 )}
 
                 {mode === "trainer" && (

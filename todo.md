@@ -11,3 +11,4 @@
 11. delete trainer, refund payments linked to one
 12. Systen notifications (push or similar, when trainer acc approved, reservation accepted, etc.)
 13. UI finishing touches
+14. Dark mode? Maybe even language selector?
