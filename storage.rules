@@ -1,0 +1,17 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    //Trainer CV: only trainer can upload, admin and self can view
+    match /trainers/{uid}/cv.pdf {
+      allow read: if request.auth != null
+        && (request.auth.uid == uid 
+        || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == "admin");
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType == "application/pdf";
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
