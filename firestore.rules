@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() { return signedIn()
+      && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"; }
+
+    //user sees self, admin sees all
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create: if isSelf(uid)
+        && request.resource.data.role in ["client", "trainer"]
+        && request.resource.data.email == request.auth.token.email;
+      allow update: if isSelf(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["firstName", "lastName", "updatedAt"]);
+      allow delete: if false;
+    }
+
+    //trainers: clients see only verified and active ones
+    match /trainers/{uid} {
+      allow read: if isSelf(uid) || isAdmin() || (signedIn() && resource.data.status == "approved" && resource.data.active == true)
+      allow create: if isSelf(uid) 
+        && getAfter(/databases/$(database)/documents/users/$(uid)).data.role == "trainer"
+        && request.resource.data.status == "pending"
+        && request.resource.data.active == true
+        && request.resource.data.priceCents is int
+        && request.resource.data.priceCents > 0;
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    //locations: all see active ones, admin can edit
+    match /locations/{id} {
+      allow read: if resource.data.active == true || isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}
