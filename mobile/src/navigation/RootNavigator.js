@@ -7,9 +7,9 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import TrainerRegisterScreen from '../screens/TrainerRegisterScreen';
 import ClientHomeScreen from '../screens/ClientHomeScreen';
-import TrainerHomeScreen from '../screens/TrainerHomeScreen';
 import TrainerStatusScreen from '../screens/TrainerStatusScreen';
 import UnsupportedRoleScreen from '../screens/UnsupportedRoleScreen';
+import TrainerTabs from './TrainerTabs';
 
 const Stack = createNativeStackNavigator();
 
@@ -50,7 +50,7 @@ export default function RootNavigator() {
                 )}
 
                 {mode === "trainer" && (
-                    <Stack.Screen name="TrainerHome" component={TrainerHomeScreen} />
+                    <Stack.Screen name="TrainerApp" component={TrainerTabs} />
                 )}
 
                 {mode === "trainerStatus" && (

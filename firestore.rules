@@ -36,5 +36,30 @@ service cloud.firestore {
       allow read: if resource.data.active == true || isAdmin();
       allow write: if isAdmin();
     }
+
+    //timeslots: signed is users read, trainer creates and deletes own free ones
+    match /timeslots/{id} {
+      function myTrainer() {
+        return get(/databases/$(database)/documents/trainers/$(request.auth.uid)).data;
+      }
+
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.trainerId == request.auth.uid
+        && myTrainer().status == "approved"
+        && myTrainer().active == true
+        && request.resource.data.locationId == myTrainer().locationId
+        && request.resource.data.status == "free"
+        && request.resource.data.reservationId == null
+        && request.resource.data.startAt is timestamp
+        && request.resource.data.endAt is timestamp
+        && request.resource.data.startAt > request.time
+        && request.resource.data.endAt > request.resource.data.startAt
+        && request.resource.data.startAt < request.time + duration.value(7, "d");
+      allow delete: if signedIn()
+        && resource.data.trainerId == request.auth.uid
+        && resource.data.status == "free";
+      allow update: if false;
+    }
   }
 }
