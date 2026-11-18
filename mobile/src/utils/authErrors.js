@@ -7,8 +7,13 @@ const MESSAGES = {
     "auth/network-request-failed": "Network error. Please check your internet connection.",
     "permission-denied": "You do not have permission to perform this action.",
     "unavailable": "Service is currently unavailable. Please try again later.",
+    "functions/unavailable": "Network error. Please check your Internet connection",
 }
 
 export function authErrorMessage(error) {
-    return MESSAGES[error?.code] ?? "An unknown error occurred. Please try again.";
+    if (MESSAGES[error?.code]) return MESSAGES[error.code];
+    if (error?.code?.startsWith("functions/") && error.code !== "functions/internal") {
+        return error.message;
+    }
+    return "An unknown error occured. Please try again.";
 }

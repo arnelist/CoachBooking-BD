@@ -1,0 +1,14 @@
+import { httpsCallable } from "firebase/functions";
+import { functions } from "./firebase";
+
+const createReservationFn = httpsCallable(functions, "createReservation");
+const cancelPendingReservationFn = httpsCallable(functions, "cancelPendingReservation");
+
+export async function createReservation(timeslotId) {
+    const { data } = await createReservationFn({ timeslotId });
+    return data.reservationId;
+}
+
+export function cancelPendingReservation(reservationId) {
+    return cancelPendingReservationFn({ reservationId });
+}

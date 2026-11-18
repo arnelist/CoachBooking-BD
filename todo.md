@@ -1,9 +1,9 @@
 1. ~~carcass~~
 2. ~~authentification (register, login)~~
-3. home screens based on role
+3. ~~home screens based on role~~
 4. reservations (accept, reject)
 5. admin panel
-6. timeslot creation (CRUD, etc.)
+6. ~~timeslot creation (CRUD, etc.)~~
 7. client reservations (choose trainer, location, time, block timeslot if transaction pending)
 8. stripe system, free timeslot is payment failed
 9. reservation management

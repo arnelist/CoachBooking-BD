@@ -5,8 +5,10 @@ import { db } from "../services/firebase";
 import DayPicker from "../components/DayPicker";
 import { getNextDays } from "../utils/dates";
 import { formatPrice } from "../utils/price";
+import { createReservation } from "../services/reservations";
+import { authErrorMessage } from "../utils/authErrors";
 
-export default function ClientTrainerScreen ({ route }) {
+export default function ClientTrainerScreen ({ route, navigation }) {
     const { trainerId, locationName } = route.params;
     const days = useMemo(() => getNextDays(7), []);
     const [trainer, setTrainer] = useState(undefined); // undefined - loading, null - unavailable
@@ -14,6 +16,7 @@ export default function ClientTrainerScreen ({ route }) {
     const [slots, setSlots] = useState([]);
     const [slotsLoading, setSlotsLoading] = useState(true);
     const [selectedSlotId, setSelectedSlotId] = useState(null);
+    const [booking, setBooking] = useState(false);
 
     //Real-time profile
     useEffect(() => {
@@ -59,11 +62,17 @@ export default function ClientTrainerScreen ({ route }) {
         setSelectedSlotId(null);
     }
 
-    function handleBook() {
-        Alert.alert(
-            "Coming soon",
-            `Booking ${selectedSlot.startTime}-${selectedSlot.endTime} will be available in the next update.`
-        );
+    async function handleBook() {
+        setBooking(true);
+        try {
+            const reservationId = await createReservation(selectedSlot.id);
+            setSelectedSlotId(null);
+            navigation.navigate("Checkout", { reservationId });
+        } catch(e) {
+            Alert.alert("Booking failed ", authErrorMessage(e));
+        } finally {
+            setBooking(false);
+        }
     }
 
     if (trainer === undefined) {
@@ -131,13 +140,17 @@ export default function ClientTrainerScreen ({ route }) {
 
             <View style={styles.footer}>
                 <Pressable
-                style={[styles.button, !selectedSlot && styles.buttonDisabled]}
-                onPress={handleBook}
-                disabled={!selectedSlot}
+                    style={[styles.button, (!selectedSlot || booking) && styles.buttonDisabled]}
+                    onPress={handleBook}
+                    disabled={!selectedSlot || booking}
                 >
-                <Text style={styles.buttonText}>
-                    {selectedSlot ? `Book ${selectedSlot.startTime}–${selectedSlot.endTime}` : "Choose a time"}
-                </Text>
+                    {booking ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <Text style={styles.buttonText}>
+                            {selectedSlot ? `Book ${selectedSlot.startTime}-${selectedSlot.endTime}` : "Choose a time"}
+                        </Text>
+                    )}
                 </Pressable>
             </View>
         </View>

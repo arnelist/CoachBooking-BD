@@ -6,6 +6,7 @@ import ClientTrainersScreen from "../screens/ClientTrainersScreen";
 import ClientTrainerScreen from "../screens/ClientTrainerScreen";
 import ClientReservationsScreen from "../screens/ClientReservationsScreen";
 import ClientProfileScreen from "../screens/ClientProfileScreen";
+import ClientCheckoutScreen from "../screens/ClientCheckoutScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -33,6 +34,11 @@ function BookStack() {
                 name="Trainer"
                 component={ClientTrainerScreen}
                 options={({ route }) => ({ title: route.params.name })}
+            />
+            <Stack.Screen
+                name="Checkout"
+                component={ClientCheckoutScreen}
+                options={{ title: "Confirm booking" }}
             />
         </Stack.Navigator>
     );
