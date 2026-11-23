@@ -48,7 +48,7 @@ export default function ClientTabs() {
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
-                topBarActiveTintColor: "#111827",
+                tabBarActiveTintColor: "#111827",
                 tabBarInactiveTintColor: "#9ca3af",
                 tabBarIcon: ({ color, size }) => (
                     <Ionicons name={ICONS[route.name]} size={size} color={color} />

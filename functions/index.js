@@ -18,6 +18,7 @@ const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
 const HOLD_MINUTES = 10;
 const KEEP_EXPIRED_DAYS = 7;
 const CURRENCY = "eur";
+const CANCEL_HOURS = 24;
 
 function stripe() {
     return new Stripe(STRIPE_SECRET_KEY.value());
@@ -101,6 +102,33 @@ async function confirmReservation(intent, reservationId) {
             updatedAt: FieldValue.serverTimestamp() 
         }).catch(() => {});
     }
+}
+
+//Refund every successful payment
+async function refundReservation(reservationId) {
+    const payments = await db
+        .collection("payments")
+        .where("reservationId", "==", reservationId)
+        .where("status", "==", "succeeded")
+        .get();
+    
+    for (const p of payments.docs) {
+        try {
+            await stripe().refunds.create(
+                { payment_intent: p.id },
+                { idempotencyKey: `refund-${p.id}` }
+            );
+        } catch (e) {
+            //Already refunded
+            if (e.code !== "charge_already_refunded") throw e;
+        }
+        await p.ref.update({ status: "refunded" });
+    }
+
+    await db.doc(`reservations/${reservationId}`).update({
+        paymentStatus: "refunded",
+        updatedAt: FieldValue.serverTimestamp(),
+    });
 }
 
 //Once reservation starts, timeslot is blocked for others
@@ -223,6 +251,52 @@ exports.cancelPendingReservation = onCall({ secrets: [STRIPE_SECRET_KEY] }, asyn
         return { ok: true };
 });
 
+//Client cancels a paid reservation at least 24h before start
+exports.cancelReservation = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Please log in again.");
+
+    const reservationId = request.data?.reservationId;
+
+    if (typeof reservationId !== "string" || reservationId === "") {
+        throw new HttpsError("invalid-argument", "Reservation is missing.");
+    }
+
+    const reservationRef = db.doc(`reservations/${reservationId}`);
+
+    await db.runTransaction(async (tx) => {
+        const reservation = (await tx.get(reservationRef)).data();
+        if (!reservation || reservation.clientId !== request.auth.uid) {
+            throw new HttpsError("failed-precondition", "Reservation not found.");
+        }
+        if (reservation.status !== "confirmed") {
+            throw new HttpsError("failed-precondition", "This reservation can no longer be cancelled.");
+        }
+        if (reservation.startAt.toMillis() - Date.now() < CANCEL_HOURS * 3600 * 1000) {
+            throw new HttpsError("failed-precondition", `Reservations can only be cancelled at least ${CANCEL_HOURS} hours before the start.`);
+        }
+
+        const slotRef = db.doc(`timeslots/${reservation.timeslotId}`);
+        const slot = (await tx.get(slotRef)).data();
+
+        tx.update(reservationRef, {
+            status: "cancelled",
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        //Time becomes available to others again
+        if (slot && slot.reservationId === reservationId) {
+            tx.update(slotRef, { status: "free", reservationId: null, holdExpiresAt: null });
+        }
+    })
+
+    try {
+        await refundReservation(reservationId);
+    } catch (e) {
+        console.error("Refund failed, will retry", reservationId, e);
+    }
+    return { ok: true };
+})
+
 //Stripe reports payment result
 exports.stripeWebhook = onRequest(
     { secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] },
@@ -283,5 +357,19 @@ exports.deletePastFreeSlots = onSchedule(
             past.slice(i, i + 500).forEach((d) => batch.delete(d.ref));
             await batch.commit();
         } 
+    }
+);
+
+exports.retryRefunds = onSchedule(
+    { schedule: "every 30 minutes", timeZone: "Europe/Vilnius", secrets: [STRIPE_SECRET_KEY] },
+    async () => {
+        const snap = await db
+            .collection("reservations")
+            .where("status", "==", "cancelled")
+            .where("paymentStatus", "==", "paid")
+            .get();
+        for (const d in snap.docs) {
+            await refundReservation(d.id).catch((e) => console.error("Refund retry failed", d.id, e));
+        }
     }
 );
