@@ -6,7 +6,7 @@ const cancelPendingReservationFn = httpsCallable(functions, "cancelPendingReserv
 
 export async function createReservation(timeslotId) {
     const { data } = await createReservationFn({ timeslotId });
-    return data.reservationId;
+    return data;
 }
 
 export function cancelPendingReservation(reservationId) {

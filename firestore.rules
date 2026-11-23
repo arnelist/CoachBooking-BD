@@ -69,5 +69,11 @@ service cloud.firestore {
         || isAdmin());
       allow write: if false;
     }
+
+    //payments: written by Cloud Functions, visible to admin
+    match /payments/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }
