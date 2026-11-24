@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { doc, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import { getDownloadURL, ref } from "firebase/storage";
-import { db, storage } from "../firebase";
+import { db, storage, functions } from "../firebase";
 import { parsePriceToCents } from "../utils/price";
 import { STATUS_LABELS, formatDate, getTrainerStatus } from "../utils/trainers";
+import { httpsCallable } from "firebase/functions";
+
+const deleteTrainerFn = httpsCallable(functions, "deleteTrainer");
 
 // Forma užpildoma esamais trenerio duomenimis
 function toForm(trainer) {
@@ -65,7 +68,8 @@ export default function TrainerDetails({ trainer, locations, onClose }) {
             setNotice(successText);
             return true;
         } catch (e) {
-            setError(`Something went wrong (${e.code}).`);
+            const readable = e.code?.startsWith("functions/") && e.code !== "functions/internal";
+            setError(readable ? e.message : `Something went wrong (${e.code}).`)
             return false;
         } finally {
             setSaving(false);
@@ -125,6 +129,19 @@ export default function TrainerDetails({ trainer, locations, onClose }) {
         );
     }
 
+    function handleDelete() {
+        const name = `${trainer.firstName} ${trainer.lastName}`;
+        if (
+            !window.confirm(
+                `Delete ${name}?\n\nThe account, timeslots and reservations will be deleted. ` +
+                "Future paid reservations will be cancelled and refunded. This cannot be undone."
+            )
+        ) {
+            return;
+        }
+        run(() => deleteTrainerFn({ trainerId: trainer.id }), "Trainer deleted.");
+    }
+
     //Update, also visible under "users"
     function handleSave(e) {
         e.preventDefault();
@@ -171,179 +188,191 @@ export default function TrainerDetails({ trainer, locations, onClose }) {
 
     return (
         <section className="card page-form details">
-        <div className="details-header">
-            <div>
-            <h2>
-                {trainer.firstName} {trainer.lastName}
-            </h2>
-            <p className="muted">{trainer.email}</p>
-            </div>
-            <span className={`badge badge-${status}`}>{STATUS_LABELS[status]}</span>
-            <button type="button" className="btn btn-secondary btn-small" onClick={onClose}>
-            Close
-            </button>
-        </div>
-
-        <dl className="details-meta">
-            <div>
-            <dt>Registered</dt>
-            <dd>{formatDate(trainer.createdAt)}</dd>
-            </div>
-            <div>
-            <dt>Reviewed</dt>
-            <dd>{formatDate(trainer.reviewedAt)}</dd>
-            </div>
-            <div>
-            <dt>CV</dt>
-            <dd>
-                {!trainer.cvPath ? (
-                "Not uploaded"
-                ) : cvUrl ? (
-                <a href={cvUrl} target="_blank" rel="noreferrer">
-                    {trainer.cvName ?? "Open CV"}
-                </a>
-                ) : (
-                "Loading..."
-                )}
-            </dd>
-            </div>
-        </dl>
-
-        {status === "rejected" && trainer.rejectionReason && (
-            <p className="note">Rejection reason: {trainer.rejectionReason}</p>
-        )}
-
-        {/* Peržiūra: laukiantys ir atmesti (atmestą galima patvirtinti vėliau) */}
-        {(status === "pending" || status === "rejected") &&
-            (rejecting ? (
-            <div className="form">
-                <label>
-                Rejection reason
-                <textarea
-                    rows={3}
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder="Shown to the trainer in the app"
-                    autoFocus
-                />
-                </label>
-                <div className="actions">
-                <button type="button" className="btn btn-danger" onClick={handleReject} disabled={saving}>
-                    Reject trainer
+            <div className="details-header">
+                <div>
+                <h2>
+                    {trainer.firstName} {trainer.lastName}
+                </h2>
+                <p className="muted">{trainer.email}</p>
+                </div>
+                <span className={`badge badge-${status}`}>{STATUS_LABELS[status]}</span>
+                <button type="button" className="btn btn-secondary btn-small" onClick={onClose}>
+                Close
                 </button>
+            </div>
+
+            <dl className="details-meta">
+                <div>
+                <dt>Registered</dt>
+                <dd>{formatDate(trainer.createdAt)}</dd>
+                </div>
+                <div>
+                <dt>Reviewed</dt>
+                <dd>{formatDate(trainer.reviewedAt)}</dd>
+                </div>
+                <div>
+                <dt>CV</dt>
+                <dd>
+                    {!trainer.cvPath ? (
+                    "Not uploaded"
+                    ) : cvUrl ? (
+                    <a href={cvUrl} target="_blank" rel="noreferrer">
+                        {trainer.cvName ?? "Open CV"}
+                    </a>
+                    ) : (
+                    "Loading..."
+                    )}
+                </dd>
+                </div>
+            </dl>
+
+            {status === "rejected" && trainer.rejectionReason && (
+                <p className="note">Rejection reason: {trainer.rejectionReason}</p>
+            )}
+
+            {/* Peržiūra: laukiantys ir atmesti (atmestą galima patvirtinti vėliau) */}
+            {(status === "pending" || status === "rejected") &&
+                (rejecting ? (
+                <div className="form">
+                    <label>
+                    Rejection reason
+                    <textarea
+                        rows={3}
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="Shown to the trainer in the app"
+                        autoFocus
+                    />
+                    </label>
+                    <div className="actions">
+                    <button type="button" className="btn btn-danger" onClick={handleReject} disabled={saving}>
+                        Reject trainer
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setRejecting(false)}
+                        disabled={saving}
+                    >
+                        Cancel
+                    </button>
+                    </div>
+                </div>
+                ) : (
+                <div className="actions">
+                    <button type="button" className="btn" onClick={handleApprove} disabled={saving}>
+                    Approve
+                    </button>
+                    {status === "pending" && (
+                    <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => setRejecting(true)}
+                        disabled={saving}
+                    >
+                        Reject
+                    </button>
+                    )}
+                </div>
+                ))}
+
+            {(status === "approved" || status === "inactive") && (
+                <div className="actions">
                 <button
                     type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setRejecting(false)}
+                    className={`btn ${trainer.active ? "btn-danger" : ""}`}
+                    onClick={handleToggleActive}
                     disabled={saving}
                 >
-                    Cancel
+                    {trainer.active ? "Deactivate" : "Activate"}
                 </button>
                 </div>
-            </div>
-            ) : (
-            <div className="actions">
-                <button type="button" className="btn" onClick={handleApprove} disabled={saving}>
-                Approve
-                </button>
-                {status === "pending" && (
-                <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => setRejecting(true)}
-                    disabled={saving}
-                >
-                    Reject
-                </button>
-                )}
-            </div>
-            ))}
+            )}
 
-        {(status === "approved" || status === "inactive") && (
-            <div className="actions">
-            <button
-                type="button"
-                className={`btn ${trainer.active ? "btn-danger" : ""}`}
-                onClick={handleToggleActive}
-                disabled={saving}
-            >
-                {trainer.active ? "Deactivate" : "Activate"}
-            </button>
-            </div>
-        )}
+            {error && <p className="error">{error}</p>}
+            {notice && <p className="success">{notice}</p>}
 
-        {error && <p className="error">{error}</p>}
-        {notice && <p className="success">{notice}</p>}
+            <form className="form details-form" onSubmit={handleSave}>
+                <h3>Trainer details</h3>
 
-        <form className="form details-form" onSubmit={handleSave}>
-            <h3>Trainer details</h3>
+                <div className="form-row">
+                <label>
+                    First name
+                    <input value={form.firstName} onChange={(e) => updateField("firstName", e.target.value)} />
+                </label>
+                <label>
+                    Last name
+                    <input value={form.lastName} onChange={(e) => updateField("lastName", e.target.value)} />
+                </label>
+                </div>
 
-            <div className="form-row">
-            <label>
-                First name
-                <input value={form.firstName} onChange={(e) => updateField("firstName", e.target.value)} />
-            </label>
-            <label>
-                Last name
-                <input value={form.lastName} onChange={(e) => updateField("lastName", e.target.value)} />
-            </label>
-            </div>
-
-            <div className="form-row">
-            <label>
-                Specialization
-                <input
-                value={form.specialization}
-                onChange={(e) => updateField("specialization", e.target.value)}
-                />
-            </label>
-            <label>
-                Location
-                <select value={form.locationId} onChange={(e) => updateField("locationId", e.target.value)}>
-                <option value="" disabled>
-                    Choose a location
-                </option>
-                {locations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                    {loc.name}
-                    {loc.active ? "" : " (hidden)"}
+                <div className="form-row">
+                <label>
+                    Specialization
+                    <input
+                    value={form.specialization}
+                    onChange={(e) => updateField("specialization", e.target.value)}
+                    />
+                </label>
+                <label>
+                    Location
+                    <select value={form.locationId} onChange={(e) => updateField("locationId", e.target.value)}>
+                    <option value="" disabled>
+                        Choose a location
                     </option>
-                ))}
-                </select>
-            </label>
-            <label className="narrow-field">
-                Price, €
-                <input
-                inputMode="decimal"
-                value={form.price}
-                onChange={(e) => updateField("price", e.target.value)}
+                    {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                        {loc.name}
+                        {loc.active ? "" : " (hidden)"}
+                        </option>
+                    ))}
+                    </select>
+                </label>
+                <label className="narrow-field">
+                    Price, €
+                    <input
+                    inputMode="decimal"
+                    value={form.price}
+                    onChange={(e) => updateField("price", e.target.value)}
+                    />
+                </label>
+                </div>
+
+                <label>
+                Education
+                <textarea
+                    rows={3}
+                    value={form.education}
+                    onChange={(e) => updateField("education", e.target.value)}
                 />
-            </label>
-            </div>
+                </label>
+                <label>
+                Description
+                <textarea
+                    rows={4}
+                    value={form.description}
+                    onChange={(e) => updateField("description", e.target.value)}
+                />
+                </label>
 
-            <label>
-            Education
-            <textarea
-                rows={3}
-                value={form.education}
-                onChange={(e) => updateField("education", e.target.value)}
-            />
-            </label>
-            <label>
-            Description
-            <textarea
-                rows={4}
-                value={form.description}
-                onChange={(e) => updateField("description", e.target.value)}
-            />
-            </label>
-
-            <div className="actions">
-            <button className="btn" type="submit" disabled={saving}>
-                {saving ? "Saving..." : "Save changes"}
-            </button>
+                <div className="actions">
+                <button className="btn" type="submit" disabled={saving}>
+                    {saving ? "Saving..." : "Save changes"}
+                </button>
+                </div>
+            </form>
+            <div className="danger-zone">
+                <h3>Delete trainer</h3>
+                <p className="muted">
+                    Deletes the account, timeslots and reservations. Future paid reservations are cancelled
+                    and refunded to clients.
+                </p>
+                <div className="actions">
+                    <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={saving}>
+                        {saving ? "Please wait..." : "Delete trainer"}
+                    </button>
+                </div>
             </div>
-        </form>
         </section>
   );
 }

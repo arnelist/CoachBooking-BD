@@ -14,3 +14,4 @@
 14. UI finishing touches
 15. Dark mode? Maybe even language selector?
 16. Optimise code - styles file, reduce repeating code, etc.
+17. On Admin panel - for pending approvals, have a number of requests in a red circle next to trainers tab (for example, 1 if 1 trainer is pending)

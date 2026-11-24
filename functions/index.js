@@ -6,6 +6,17 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const Stripe = require("stripe");
 const crypto = require("crypto");
+const { getAuth } = require("firebase-admin/auth");
+const { getStorage } = require("firebase-admin/storage");
+
+const TRAINER_REMOVED_REASON = "The trainer is no longer available.";
+
+//Delete many documents, BulkWriter splits them into batches itself
+async function deleteDocs(docs) {
+    const writer = db.bulkWriter();
+    docs.forEach((d) => writer.delete(d.ref));
+    await writer.close();
+}
 
 initializeApp();
 const db = getFirestore();
@@ -476,7 +487,7 @@ exports.retryRefunds = onSchedule(
             .where("status", "==", "cancelled")
             .where("paymentStatus", "==", "paid")
             .get();
-        for (const d in snap.docs) {
+        for (const d of snap.docs) {
             await refundReservation(d.id).catch((e) => console.error("Refund retry failed", d.id, e));
         }
     }
@@ -589,3 +600,80 @@ exports.markAttendance = onCall(async (request) => {
     });
     return { ok: true };
 });
+
+//Admin deleted trainer (includes acc, payments, and reservations)
+//Future paid reservations are refunded
+exports.deleteTrainer = onCall(
+    { secrets: [STRIPE_SECRET_KEY], timeoutSeconds: 300 },
+    async (request) => {
+        if (!request.auth) throw new HttpsError("unauthenticated", "Please log in again.");
+        const caller = (await db.doc(`users/${request.auth.uid}`).get()).data();
+        if (caller?.role !== "admin") {
+            throw new HttpsError("permission-denied", "Only administrators can delete trainers.");
+        }
+
+        const trainerId = request.data?.trainerId;
+        if (typeof trainerId !== "string" || trainerId === "") {
+            throw new HttpsError("invalid-argument", "Trainer is missing.");
+        }
+
+        const trainerRef = db.doc(`trainers/${trainerId}`);
+        const userRef = db.doc(`users/${trainerId}`);
+        const [trainerSnap, userSnap] = await Promise.all([trainerRef.get(), userRef.get()]);
+        //Also works when a previous attempt deleted only part of the data
+        if (!trainerSnap.exists && userSnap.data()?.role !== "trainer") {
+            throw new HttpsError("not-found", "Trainer not found.");
+        }
+
+        //1. No new bookings
+        if (trainerSnap.exists) {
+            await trainerRef.update({ active: false, updatedAt: FieldValue.serverTimestamp() });
+        }
+
+        const reservationsQuery = db.collection("reservations").where("trainerId", "==", trainerId);
+
+        //2. Unfinished payments are cancelled, future ones are refunded
+        const reservations = await reservationsQuery.get();
+        const now = Date.now();
+        for (const d of reservations.docs) {
+            const r = d.data();
+            try {
+                if (r.status === "pending") {
+                    await releaseHold(d.id, "cancelled");
+                } else if (r.status === "confirmed" && r.startAt.toMillis() > now) {
+                    await cancelConfirmedReservation(d.id, () => {}, { cancelReason: TRAINER_REMOVED_REASON });
+                }
+            } catch (e) {
+                //Status changed meanwhile (e.g. client cancelled himself) - nothing to do
+                if (e.code !== "failed-precondition") throw e;
+            }
+        }
+
+        //3. Data is deleted only after money is actually returned
+        const unrefunded = await reservationsQuery
+            .where("status", "==", "cancelled")
+            .where("paymentStatus", "==", "paid")
+            .get();
+        try {
+            for (const d of unrefunded.docs) await refundReservation(d.id);
+        } catch (e) {
+            console.error("Refund failed while deleting trainer", trainerId, e);
+            throw new HttpsError(
+                "unavailable",
+                "Some payments could not be refunded. The trainer is deactivated, please try again later."
+            );
+        }
+
+        //4. Trainer data
+        await deleteDocs((await reservationsQuery.get()).docs);
+        await deleteDocs((await db.collection("timeslots").where("trainerId", "==", trainerId).get()).docs);
+        await Promise.all([trainerRef.delete(), userRef.delete()]);
+        await getStorage().bucket().file(`trainers/${trainerId}/cv.pdf`).delete({ ignoreNotFound: true });
+        try {
+            await getAuth().deleteUser(trainerId);
+        } catch (e) {
+            if (e.code !== "auth/user-not-found") throw e;
+        }
+        return { ok: true };
+    }
+);
