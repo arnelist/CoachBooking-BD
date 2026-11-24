@@ -5,6 +5,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const Stripe = require("stripe");
+const { https } = require("firebase-functions/v1");
 
 initializeApp();
 const db = getFirestore();
@@ -129,6 +130,41 @@ async function refundReservation(reservationId) {
         paymentStatus: "refunded",
         updatedAt: FieldValue.serverTimestamp(),
     });
+}
+
+//Cancel confirmed reservation: free time and refund payment
+async function cancelConfirmedReservation(reservationId, validate, fields = {}) {
+    const reservationRef = db.doc(`reservations/${reservationId}`);
+
+    await db.runTransaction(async (tx) => {
+        const reservation = (await tx.get(reservationRef)).data();
+        if (!reservation) throw new HttpsError("not-found", "Reservation not found.");
+        //Throw HttpsError when caller may not cancel
+        validate(reservation);
+        if (reservation.status !== "confirmed") {
+            throw new HttpsError("failed-precondition", "This reservation can no longer be cancelled.");
+        }
+
+        const slotRef = db.doc(`timeslots/${reservation.timeslotId}`);
+        const slot = (await tx.get(slotRef)).data();
+
+        tx.update(reservationRef, {
+            ...fields,
+            status: "cancelled",
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+        //Time becomes available to others again
+        if (slot && slot.reservationId === reservationId) {
+            tx.update(slotRef, { status: "free", reservationId: null, holdExpiresAt: null });
+        }
+    });
+
+    //Cancelled even if Stripe fails, retryRefunds will finish the refund
+    try {
+        await refundReservation(reservationId);
+    } catch (e) {
+        console.error("Refund failed, will retry", reservationId, e);
+    }
 }
 
 //Once reservation starts, timeslot is blocked for others
@@ -256,46 +292,104 @@ exports.cancelReservation = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (requ
     if (!request.auth) throw new HttpsError("unauthenticated", "Please log in again.");
 
     const reservationId = request.data?.reservationId;
-
     if (typeof reservationId !== "string" || reservationId === "") {
         throw new HttpsError("invalid-argument", "Reservation is missing.");
     }
 
-    const reservationRef = db.doc(`reservations/${reservationId}`);
-
-    await db.runTransaction(async (tx) => {
-        const reservation = (await tx.get(reservationRef)).data();
-        if (!reservation || reservation.clientId !== request.auth.uid) {
-            throw new HttpsError("failed-precondition", "Reservation not found.");
-        }
-        if (reservation.status !== "confirmed") {
-            throw new HttpsError("failed-precondition", "This reservation can no longer be cancelled.");
+    await cancelConfirmedReservation(reservationId, (reservation) => {
+        if (reservation.clientId !== request.auth.uid) {
+            throw new HttpsError("not-found", "Reservation not found.");
         }
         if (reservation.startAt.toMillis() - Date.now() < CANCEL_HOURS * 3600 * 1000) {
             throw new HttpsError("failed-precondition", `Reservations can only be cancelled at least ${CANCEL_HOURS} hours before the start.`);
         }
+    });
+    return { ok: true };
+});
 
-        const slotRef = db.doc(`timeslots/${reservation.timeslotId}`);
-        const slot = (await tx.get(slotRef)).data();
+exports.trainerCancelReservation = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Please log in again.");
 
+    const reservationId = request.data?.reservationId;
+    if (typeof reservationId !== "string" || reservationId === "") {
+        throw new HttpsError("invalid-argument", "Reservation is missing.");
+    }
+    const reason = typeof request.data?.reason === "string" ? request.data.reason.trim() : "";
+    if (reason.length < 3 || reason.length > 200) {
+        throw new HttpsError("invalid-argument", "Please enter a reasom (3-200 characters).");
+    }
+
+    await cancelConfirmedReservation(
+        reservationId, (reservation) => {
+            if (reservation.trainerId !== request.auth.uid) {
+                throw new HttpsError("not-found", "Reservation not found.");
+            }
+            if (reservation.startAt.toMillis() <= Date.now()) {
+                throw new HttpsError("failed-precondition", "This training has alraedy started.");
+            }
+        },
+        { cancelReason: reason }
+    );
+    return { ok: true };
+});
+
+//Trainer moves reservation to a different time
+exports.rescheduleReservation = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Please log in again.");
+    const uid = request.auth.uid;
+
+    const reservationId = request.data?.reservationId;
+    const timeslotId = request.data?.timeslotId;
+    if (typeof reservationId !== "string" || reservationId === ""
+        || typeof timeslotId !== "string" || timeslotId === "") {
+        throw new HttpsError("invalid-argument", "Reservation or time is missing.");
+    }
+
+    const reservationRef = db.doc(`reservations/${reservationId}`);
+    const newSlotRef = db.doc(`timeslots/${timeslotId}`);
+
+    await db.runTransaction(async (tx) => {
+        const reservation = (await tx.get(reservationRef)).data();
+        if (!reservation || reservation.trainerId !== uid) {
+            throw new HttpsError("not-found", "Reservation not found.");
+        }
+        if (reservation.status !== "confirmed" || reservation.startAt.toMillis() <= Date.now()) {
+            throw new HttpsError("failed-precondition", "This reservation can no longer be rescheduled.");
+        }
+
+        const newSlot = (await tx.get(newSlotRef)).data();
+        if (!newSlot || newSlot.trainerId !== uid || newSlot.status !== "free") {
+            throw new HttpsError("already-exists", "This time is no longer free. Please choose another one.");
+        }
+        if (newSlot.startAt.toMillis() <= Date.now()) {
+            throw new HttpsError("failed-precondition", "This time has already passed.");
+        }
+        //Client paid for this length, so the new time must be equally long
+        const oldLength = reservation.endAt.toMillis() - reservation.startAt.toMillis();
+        if (newSlot.endAt.toMillis() - newSlot.startAt.toMillis() !== oldLength) {
+            throw new HttpsError("failed-precondition", "Choose a time of the same length.");
+        }
+
+        const oldSlotRef = db.doc(`timeslots/${reservation.timeslotId}`);
+        const oldSlot = (await tx.get(oldSlotRef)).data();
+
+        tx.update(newSlotRef, { status: "booked", reservationId, holdExpiresAt: null });
+        if (oldSlot && oldSlot.reservationId === reservationId) {
+            tx.update(oldSlotRef, { status: "free", reservationId: null, holdExpiresAt: null });
+        }
         tx.update(reservationRef, {
-            status: "cancelled",
+            timeslotId,
+            date: newSlot.date,
+            startTime: newSlot.startTime,
+            endTime: newSlot.endTime,
+            startAt: newSlot.startAt,
+            endAt: newSlot.endAt,
+            rescheduled: true,
             updatedAt: FieldValue.serverTimestamp(),
         });
-
-        //Time becomes available to others again
-        if (slot && slot.reservationId === reservationId) {
-            tx.update(slotRef, { status: "free", reservationId: null, holdExpiresAt: null });
-        }
-    })
-
-    try {
-        await refundReservation(reservationId);
-    } catch (e) {
-        console.error("Refund failed, will retry", reservationId, e);
-    }
+    });
     return { ok: true };
-})
+});
 
 //Stripe reports payment result
 exports.stripeWebhook = onRequest(

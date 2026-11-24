@@ -2,7 +2,7 @@ import { View, Text, StyleSheet } from "react-native";
 
 const STATUS = {
     confirmed: { label: "Confirmed", bg: "#dbeafe", color: "#1e40af" },
-    checkedIn: { label: "Checked in", bg: "#dcfce7", color: "#166534" },
+    checkedIn: { label: "Attended", bg: "#dcfce7", color: "#166534" },
     noShow: { label: "No-show", bg: "#fee2e2", color: "#991b1b" },
     cancelled: { label: "Cancelled", bg: "#f3f4f6", color: "#6b7280" },
 };
@@ -23,7 +23,7 @@ function Badge({ label, bg, color }) {
     );
 }
 
-export default function ReservationBadges({ reservation }) {
+export default function ReservationBadges({ reservation, showPayment = true }) {
     const status = STATUS[reservation.status];
     const payment = 
         reservation.status === "cancelled" && reservation.paymentStatus === "paid"
@@ -33,7 +33,7 @@ export default function ReservationBadges({ reservation }) {
     return (
         <View style={styles.row}>
             {!!status && <Badge {...status} />}
-            {!!payment && <Badge {...payment} />}
+            {showPayment && !!payment && <Badge {...payment} />}
             {!!reservation.rescheduled && <Badge {...RESCHEDULED} />}
         </View>
     );
