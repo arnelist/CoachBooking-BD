@@ -6,7 +6,7 @@ import { db } from "../services/firebase";
 import { useAuth } from "../context/AuthContext";
 import Select from "../components/Select";
 import { createTimeslot, deleteTimeslot } from "../services/timeslots";
-import { getNextDays, minutesToTime, timeToMinutes, toDate } from "../utils/dates";
+import { getNextDays, minutesToTime, nowMinutes, timeToMinutes, toDate } from "../utils/dates";
 import { authErrorMessage } from "../utils/authErrors";
 import DayPicker from "../components/DayPicker";
 
@@ -73,9 +73,8 @@ export default function TrainerScheduleScreen() {
     const isToday = selectedDay === days[0].key;
     const startOptions = useMemo(() => {
         if (!isToday) return ALL_START_OPTIONS;
-        const now = new Date();
-        const nowMinutes = now.getHours() * 60 + now.getMinutes();
-        return ALL_START_OPTIONS.filter((o) => timeToMinutes(o.value) > nowMinutes);
+        const minutesNow = nowMinutes();
+        return ALL_START_OPTIONS.filter((o) => timeToMinutes(o.value) > minutesNow);
     }, [isToday]);
 
     const endTime = startTime ? minutesToTime(timeToMinutes(startTime) + duration) : null;

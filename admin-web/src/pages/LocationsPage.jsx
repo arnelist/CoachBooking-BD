@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-const EMPTY_FORM = { name: "", addrss: "", order: "", active: true };
+const EMPTY_FORM = { name: "", address: "", order: "", active: true };
 
 export default function LocationsPage() {
   const [locations, setLocations] = useState([]);

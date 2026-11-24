@@ -8,7 +8,7 @@
 8. ~~stripe system, free timeslot is payment failed~~
 9. ~~reservation management~~
 10. Adjust price depending on session length
-11. QR code system
+11. ~~QR code system~~
 12. delete trainer, refund payments linked to one
 13. Systen notifications (push or similar, when trainer acc approved, reservation accepted, etc.)
 14. UI finishing touches
