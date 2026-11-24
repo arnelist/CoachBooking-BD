@@ -6,6 +6,9 @@ const cancelPendingReservationFn = httpsCallable(functions, "cancelPendingReserv
 const cancelReservationFn = httpsCallable(functions, "cancelReservation");
 const rescheduleReservationFn = httpsCallable(functions, "rescheduleReservation");
 const trainerCancelReservationFn = httpsCallable(functions, "trainerCancelReservation");
+const getCheckInCodeFn = httpsCallable(functions, "getCheckInCode");
+const checkInFn = httpsCallable(functions, "checkIn");
+const markAttendanceFn = httpsCallable(functions, "markAttendance");
 
 export async function createReservation(timeslotId) {
     const { data } = await createReservationFn({ timeslotId });
@@ -26,4 +29,17 @@ export function rescheduleReservation(reservationId, timeslotId) {
 
 export function trainerCancelReservation(reservationId, reason) {
     return trainerCancelReservationFn({ reservationId, reason });
+}
+
+export async function getCheckInCode(reservationId) {
+    const { data } = await getCheckInCodeFn({ reservationId });
+    return data.code;
+}
+
+export function checkIn(reservationId, code) {
+    return checkInFn({ reservationId, code });
+}
+
+export function markAttendance(reservationId, attended) {
+    return markAttendanceFn({ reservationId, attended });
 }

@@ -4,14 +4,10 @@ import {
     collection,
     deleteDoc,
     doc,
-    getDocs,
-    query,
     serverTimestamp,
-    where,
-    writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { toDate, todayKey } from "../utils/dates";
+import { toDate } from "../utils/dates";
 
 export function createTimeslot({ trainerId, locationId, date, startTime, endTime }) {
     return addDoc(collection(db, "timeslots"), {

@@ -5,7 +5,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../services/firebase";
 import { useAuth } from "../context/AuthContext";
 import Select from "../components/Select";
-import { createTimeslot, deletePastFreeSlots, deleteTimeslot } from "../services/timeslots";
+import { createTimeslot, deleteTimeslot } from "../services/timeslots";
 import { getNextDays, minutesToTime, timeToMinutes, toDate } from "../utils/dates";
 import { authErrorMessage } from "../utils/authErrors";
 import DayPicker from "../components/DayPicker";
@@ -45,10 +45,6 @@ export default function TrainerScheduleScreen() {
     const [duration, setDuration] = useState(60);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
-
-    useEffect(() => {
-        deletePastFreeSlots(user.uid).catch((e) => console.log("Cleanup failed: ", e.code));
-    }, [user.uid]);
 
     useEffect(() => {
         setLoading(true);

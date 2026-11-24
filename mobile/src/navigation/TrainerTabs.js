@@ -6,6 +6,7 @@ import TrainerReservationsScreen from "../screens/TrainerReservationsScreen";
 import TrainerRescheduleScreen from "../screens/TrainerRescheduleScreen";
 import TrainerCancelScreen from "../screens/TrainerCancelScreen";
 import TrainerProfileScreen from "../screens/TrainerProfileScreen";
+import TrainerCheckInScreen from "../screens/TrainerCheckInScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -34,6 +35,11 @@ function ReservationStack() {
                 name="CancelReservation"
                 component={TrainerCancelScreen}
                 options={{ title: "Cancel reservation" }}
+            />
+            <Stack.Screen
+                name="CheckIn"
+                component={TrainerCheckInScreen}
+                options={{ title: "Check-in" }}
             />
         </Stack.Navigator>
     );

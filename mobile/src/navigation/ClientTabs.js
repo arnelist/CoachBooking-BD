@@ -7,6 +7,7 @@ import ClientTrainerScreen from "../screens/ClientTrainerScreen";
 import ClientReservationsScreen from "../screens/ClientReservationsScreen";
 import ClientProfileScreen from "../screens/ClientProfileScreen";
 import ClientCheckoutScreen from "../screens/ClientCheckoutScreen";
+import ClientCheckInScreen from "../screens/ClientCheckInScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -44,6 +45,24 @@ function BookStack() {
     );
 }
 
+//reservations -> QR scanner
+function ReservationsStack() {
+    return (
+        <Stack.Navigator>
+            <Stack.Screen
+                name="ReservationsList"
+                component={ClientReservationsScreen}
+                options={{ title: "Reservations" }}
+            />
+            <Stack.Screen
+                name="CheckIn"
+                component={ClientCheckInScreen}
+                options={{ title: "Check-in" }}
+            />
+        </Stack.Navigator>
+    )
+}
+
 export default function ClientTabs() {
     return (
         <Tab.Navigator
@@ -61,8 +80,9 @@ export default function ClientTabs() {
                 options={{ headerShown: false }} 
             />
             <Tab.Screen
-                name="Reservations" 
-                component={ClientReservationsScreen} 
+                name="Reservations"
+                component={ReservationsStack}
+                options={{ headerShown: false }}
             />
             <Tab.Screen
                 name="Profile" 

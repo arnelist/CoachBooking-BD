@@ -7,12 +7,13 @@ import { cancelReservation } from "../services/reservations";
 import ReservationBadges from "../components/ReservationBadges";
 import { formatPrice } from "../utils/price";
 import { authErrorMessage } from "../utils/authErrors";
+import { toDateKey } from "../utils/dates";
 
 const CANCEL_HOURS = 24;
 //pending and expired are unfinished bookings, not shown to the client
 const VISIBLE = ["confirmed", "checkedIn", "noShow", "cancelled"];
 
-export default function ClientReservationsScreen() {
+export default function ClientReservationsScreen({ navigation }) {
     const { user } = useAuth();
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -60,6 +61,8 @@ export default function ClientReservationsScreen() {
     function canCancel(r) {
         return r.status === "confirmed" && r.startAt.toMillis() - now >= CANCEL_HOURS * 3600 * 1000;
     }
+
+    const today = toDateKey(new Date(now));
 
     function confirmCancel(r) {
         Alert.alert(
@@ -120,7 +123,14 @@ export default function ClientReservationsScreen() {
                             <Text style={styles.subtitle}>Reason: {item.cancelReason}</Text>
                         )}
 
-                        {canCancel(item) ? (
+                        {item.status === "confirmed" && item.date === today ? (
+                            <Pressable
+                                style={styles.outline}
+                                onPress={() => navigation.navigate("CheckIn", { reservationId: item.id })}
+                            >
+                                <Text style={styles.outlineText}>Check in</Text>
+                            </Pressable>
+                        ) : canCancel(item) ? (
                             <Pressable
                                 style={[styles.outline, cancellingId !== null && styles.disabled]}
                                 onPress={() => confirmCancel(item)}

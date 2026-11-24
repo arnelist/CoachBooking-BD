@@ -5,7 +5,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const Stripe = require("stripe");
-const { https } = require("firebase-functions/v1");
+const crypto = require("crypto");
 
 initializeApp();
 const db = getFirestore();
@@ -15,6 +15,7 @@ setGlobalOptions({ region: "europe-central2", maxInstances: 10 });
 //Secret keys exist only in the functions environment
 const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
 const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
+const CHECKIN_SECRET = defineSecret("CHECKIN_SECRET");
 
 const HOLD_MINUTES = 10;
 const KEEP_EXPIRED_DAYS = 7;
@@ -23,6 +24,19 @@ const CANCEL_HOURS = 24;
 
 function stripe() {
     return new Stripe(STRIPE_SECRET_KEY.value());
+}
+
+//Today's date
+function todayInVilnius() {
+    return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Vilnius" }).format(new Date());
+}
+
+//QR-code signature: valid only for this reservation on training day
+function checkInSignature(reservationId, date) {
+    return crypto
+        .createHmac("sha256", CHECKIN_SECRET.value())
+        .update(`${reservationId}:${date}`)
+        .digest("base64url");
 }
 
 //Free unpaid reservation, free timeslot
@@ -442,7 +456,7 @@ exports.releaseExpiredHolds = onSchedule(
 exports.deletePastFreeSlots = onSchedule(
     { schedule: "every day 03:00", timeZone: "Europe/Vilnius" },
     async () => {
-        const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Vilnus" }).format(new Date());
+        const today = todayInVilnius();
         const snap = await db.collection("timeslots").where("status", "==", "free").get();
         const past = snap.docs.filter((d) => d.data().date < today);
 
@@ -467,3 +481,111 @@ exports.retryRefunds = onSchedule(
         }
     }
 );
+
+//Trainer shows QR code for today's confirmed reservation
+exports.getCheckInCode = onCall({ secrets: [CHECKIN_SECRET] }, async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Please log in again.");
+
+    const reservationId = request.data?.reservationId;
+    if (typeof reservationId !== "string" || reservationId === "") {
+        throw new HttpsError("invalid-argument", "Reservation is missing.");
+    }
+
+    const reservation = (await db.doc(`reservations/${reservationId}`).get()).data();
+    if (!reservation || reservation.trainerId !== request.auth.uid) {
+        throw new HttpsError("not-found", "Reservation not found.");
+    }
+    if (reservation.status !== "confirmed") {
+        throw new HttpsError("failed-precondition", "This reservation can't be checked in.");
+    }
+    if (reservation.date !== todayInVilnius()) {
+        throw new HttpsError("failed-precondition", "Check-in is only possible on the training day.");
+    }
+
+    return { code: `${reservationId}.${checkInSignature(reservationId, reservation.date)}` };
+});
+
+//Client scans QR code
+exports.checkIn = onCall({ secrets: [CHECKIN_SECRET] }, async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Please log in again.");
+
+    const reservationId = request.data?.reservationId;
+    const code = request.data?.code;
+    if (typeof reservationId !== "string" || reservationId === "" || typeof code !== "string") {
+        throw new HttpsError("invalid-argument", "Reservation or code is missing.");
+    }
+
+    const [codeReservationId, signature = ""] = code.split(".");
+    if (codeReservationId !== reservationId) {
+        throw new HttpsError("invalid-argument", "This code is not for this reservation.");
+    }
+
+    const reservationRef = db.doc(`reservations/${reservationId}`);
+
+    await db.runTransaction(async (tx) => {
+        const reservation = (await tx.get(reservationRef)).data();
+        if (!reservation || reservation.clientId !== request.auth.uid) {
+            throw new HttpsError("not-found", "Reservation not found.");
+        }
+        if (reservation.status === "checkedIn") {
+            throw new HttpsError("already-exists", "You are already checked in.");
+        }
+        if (reservation.status !== "confirmed") {
+            throw new HttpsError("failed-precondition", "This reservation can't be checked in.");
+        }
+
+        //Constant-time comparison, so the signature can't be guessed by timing
+        const expected = Buffer.from(checkInSignature(reservationId, reservation.date));
+        const given = Buffer.from(signature);
+        if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
+            throw new HttpsError("invalid-argument", "This code is not valid for your reservation.");
+        }
+        if (reservation.date !== todayInVilnius()) {
+            throw new HttpsError("failed-precondition", `This code is valid on ${reservation.date}.`);
+        }
+
+        tx.update(reservationRef, {
+            status: "checkedIn",
+            checkedInAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+    });
+    return { ok: true };
+});
+
+//If scanning fails, trainer marks attendance manually
+exports.markAttendance = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Please log in again.");
+
+    const reservationId = request.data?.reservationId;
+    const attended = request.data?.attended;
+    if (typeof reservationId !== "string" || reservationId === "" || typeof attended !== "boolean") {
+        throw new HttpsError("invalid-argument", "Reservation or attendance is missing.");
+    }
+
+    const reservationRef = db.doc(`reservations/${reservationId}`);
+
+    await db.runTransaction(async (tx) => {
+        const reservation = (await tx.get(reservationRef)).data();
+        if (!reservation || reservation.trainerId !== request.auth.uid) {
+            throw new HttpsError("not-found", "Reservation not found.");
+        }
+        if (reservation.status !== "confirmed") {
+            throw new HttpsError("failed-precondition", "Attendance is already marked or the reservation is cancelled.");
+        }
+        if (reservation.date > todayInVilnius()) {
+            throw new HttpsError("failed-precondition", "Attendance can be marked from the training day.");
+        }
+        if (!attended && reservation.startAt.toMillis() > Date.now()) {
+            throw new HttpsError("failed-precondition", "No-show can be marked only after the training starts.");
+        }
+
+        tx.update(
+            reservationRef,
+            attended
+                ? { status: "checkedIn", checkedInAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }
+                : { status: "noShow", updatedAt: FieldValue.serverTimestamp() }
+        );
+    });
+    return { ok: true };
+});

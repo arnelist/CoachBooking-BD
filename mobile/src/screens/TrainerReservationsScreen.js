@@ -77,7 +77,8 @@ export default function TrainerReservationsScreen({ navigation }) {
                 )
             }
             renderItem={({ item }) => {
-                const editable = item.status === "confirmed" && item.startAt.toMillis() > now;
+                const canEdit = item.status === "confirmed" && item.startAt.toMillis() > now;
+                const canCheckIn = item.status === "confirmed" && item.date === days[0].key;
                 return (
                     <View style={styles.card}>
                         <Text style={styles.title}>
@@ -88,20 +89,32 @@ export default function TrainerReservationsScreen({ navigation }) {
                             <Text style={styles.subtitle}>Reason: {item.cancelReason}</Text>
                         )}
 
-                        {editable && (
+                        {(canEdit || canCheckIn) && (
                             <View style={styles.actions}>
-                                <Pressable
-                                    style={styles.outline}
-                                    onPress={() => navigation.navigate("Reschedule", { reservationId: item.id })}
-                                >
-                                    <Text style={styles.outlineText}>Reschedule</Text>
-                                </Pressable>
-                                <Pressable
-                                    style={styles.outline}
-                                    onPress={() => navigation.navigate("CancelReservation", { reservationId: item.id })}
-                                >
-                                    <Text style={styles.outlineText}>Cancel</Text>
-                                </Pressable>
+                                {canEdit && (
+                                    <>
+                                        <Pressable
+                                            style={styles.outline}
+                                            onPress={() => navigation.navigate("Reschedule", { reservationId: item.id })}
+                                        >
+                                            <Text style={styles.outlineText}>Reschedule</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            style={styles.outline}
+                                            onPress={() => navigation.navigate("CancelReservation", { reservationId: item.id })}
+                                        >
+                                            <Text style={styles.outlineText}>Cancel</Text>
+                                        </Pressable>
+                                    </>
+                                )}
+                                {canCheckIn && (
+                                    <Pressable
+                                        style={[styles.outline, styles.dark]}
+                                        onPress={() => navigation.navigate("CheckIn", { reservationId: item.id })}
+                                    >
+                                        <Text style={[styles.outlineText, styles.darkText]}>Check-in</Text>
+                                    </Pressable>
+                                )}
                             </View>
                         )}
                     </View>
@@ -135,4 +148,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     outlineText: { fontWeight: "600", color: "#111827" },
+    dark: { backgroundColor: "#111827" },
+    darkText: { color: "#fff" },
 });
