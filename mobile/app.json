@@ -18,9 +18,6 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
     "plugins": [
       ["@stripe/stripe-react-native", { "enableGooglePay": false }]
     ]
