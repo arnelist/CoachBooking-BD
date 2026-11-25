@@ -42,7 +42,7 @@ export default function ClientTrainerScreen ({ route, navigation }) {
                 const now = new Date();
                 const list = snap.docs
                     .map((d) => ({ id: d.id, ...d.data() }))
-                    .filter((s) => s.startAt.toDate() > now) // FR30: praėję laikai nerodomi
+                    .filter((s) => s.startAt.toDate() > now)
                     .sort((a, b) => a.startTime.localeCompare(b.startTime));
                 setSlots(list);
                 setSlotsLoading(false);
@@ -69,7 +69,7 @@ export default function ClientTrainerScreen ({ route, navigation }) {
             setSelectedSlotId(null);
             navigation.navigate("Checkout", { reservationId, clientSecret });
         } catch(e) {
-            Alert.alert("Booking failed ", authErrorMessage(e));
+            Alert.alert("Booking failed", authErrorMessage(e));
         } finally {
             setBooking(false);
         }

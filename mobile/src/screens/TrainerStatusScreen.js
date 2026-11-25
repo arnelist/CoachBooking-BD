@@ -18,7 +18,7 @@ export default function TrainerStatusScreen() {
       ? `Reason: ${trainer.rejectionReason}`
       : "No reason was provided.";
   } else {
-    // status "approved", bet active === false
+    // status "approved", but active === false
     title = "Account deactivated";
     message = "Please contact the administrator for more information.";
   }

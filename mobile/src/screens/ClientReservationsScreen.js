@@ -82,7 +82,7 @@ export default function ClientReservationsScreen({ navigation }) {
         } catch (e) {
             Alert.alert("Cancellation failed", authErrorMessage(e));
         } finally {
-            setCancellingId(null);;
+            setCancellingId(null);
         }
     }
 

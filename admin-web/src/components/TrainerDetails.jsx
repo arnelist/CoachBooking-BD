@@ -8,7 +8,7 @@ import { httpsCallable } from "firebase/functions";
 
 const deleteTrainerFn = httpsCallable(functions, "deleteTrainer");
 
-// Forma užpildoma esamais trenerio duomenimis
+// Form filled out with existing trainer data
 function toForm(trainer) {
   return {
     firstName: trainer.firstName ?? "",
@@ -230,7 +230,6 @@ export default function TrainerDetails({ trainer, locations, onClose }) {
                 <p className="note">Rejection reason: {trainer.rejectionReason}</p>
             )}
 
-            {/* Peržiūra: laukiantys ir atmesti (atmestą galima patvirtinti vėliau) */}
             {(status === "pending" || status === "rejected") &&
                 (rejecting ? (
                 <div className="form">

@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
             doc(db, 'trainers', user.uid), 
             (snap) => setTrainer(snap.exists() ? { id: snap.id, ...snap.data() } : null),
             (error) => {
-                console.log('Error fetching trainer:', error.code);
+                console.warn('Error fetching trainer:', error.code);
                 setTrainer(null);
             }
         );

@@ -6,7 +6,7 @@ import { auth, db } from "../firebase";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-    ///undefined - checking, null - not logged in, object - admin
+    //undefined - checking, null - not logged in, object - admin
     const [admin, setAdmin] = useState(undefined);
     const [authError, setAuthError] = useState("");
 

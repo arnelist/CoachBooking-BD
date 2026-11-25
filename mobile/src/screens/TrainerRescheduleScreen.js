@@ -88,7 +88,7 @@ export default function TrainerRescheduleScreen({ route, navigation }) {
         );
     }
 
-    //Cliehnt paid for this length, so equally long times are offered
+    //Client paid for this length, so equally long times are offered
     const length = lengthOf(reservation);
     const options = slots.filter((s) => lengthOf(s) === length);
     const selectedSlot = options.find((s) => s.id === selectedSlotId) ?? null;

@@ -1,5 +1,3 @@
-import { VirtualizedSectionList } from "react-native";
-
 const TIME_ZONE = "Europe/Vilnius";
 const pad = (n) => String(n).padStart(2, "0");
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

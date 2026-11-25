@@ -11,7 +11,7 @@ export const STATUS_LABELS = {
   rejected: "Rejected",
 };
 
-// Firestore Timestamp, until serverTimestamp not verified, shows "-""
+// Firestore Timestamp, until serverTimestamp not verified, shows "-"
 export function formatDate(timestamp) {
   return timestamp ? timestamp.toDate().toLocaleDateString("lt-LT") : "—";
 }

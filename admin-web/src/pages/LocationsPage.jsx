@@ -94,8 +94,8 @@ export default function LocationsPage() {
         await addDoc(collection(db, "locations"), { ...data, createdAt: serverTimestamp() });
       }
       resetForm();
-    } catch {
-      setError(`Could not save location (${e.code}).`);
+    } catch (err) {
+      setError(`Could not save location (${err.code}).`);
     } finally {
       setSaving(false);
     }

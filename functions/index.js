@@ -9,6 +9,9 @@ const crypto = require("crypto");
 const { getAuth } = require("firebase-admin/auth");
 const { getStorage } = require("firebase-admin/storage");
 
+initializeApp();
+const db = getFirestore();
+
 const TRAINER_REMOVED_REASON = "The trainer is no longer available.";
 
 //Delete many documents, BulkWriter splits them into batches itself
@@ -17,9 +20,6 @@ async function deleteDocs(docs) {
     docs.forEach((d) => writer.delete(d.ref));
     await writer.close();
 }
-
-initializeApp();
-const db = getFirestore();
 
 setGlobalOptions({ region: "europe-central2", maxInstances: 10 });
 
@@ -341,7 +341,7 @@ exports.trainerCancelReservation = onCall({ secrets: [STRIPE_SECRET_KEY] }, asyn
     }
     const reason = typeof request.data?.reason === "string" ? request.data.reason.trim() : "";
     if (reason.length < 3 || reason.length > 200) {
-        throw new HttpsError("invalid-argument", "Please enter a reasom (3-200 characters).");
+        throw new HttpsError("invalid-argument", "Please enter a reason (3-200 characters).");
     }
 
     await cancelConfirmedReservation(
@@ -350,7 +350,7 @@ exports.trainerCancelReservation = onCall({ secrets: [STRIPE_SECRET_KEY] }, asyn
                 throw new HttpsError("not-found", "Reservation not found.");
             }
             if (reservation.startAt.toMillis() <= Date.now()) {
-                throw new HttpsError("failed-precondition", "This training has alraedy started.");
+                throw new HttpsError("failed-precondition", "This training has already started.");
             }
         },
         { cancelReason: reason }
@@ -601,7 +601,7 @@ exports.markAttendance = onCall(async (request) => {
     return { ok: true };
 });
 
-//Admin deleted trainer (includes acc, payments, and reservations)
+//Admin deleted trainer (includes acc and reservations)
 //Future paid reservations are refunded
 exports.deleteTrainer = onCall(
     { secrets: [STRIPE_SECRET_KEY], timeoutSeconds: 300 },
@@ -667,13 +667,13 @@ exports.deleteTrainer = onCall(
         //4. Trainer data
         await deleteDocs((await reservationsQuery.get()).docs);
         await deleteDocs((await db.collection("timeslots").where("trainerId", "==", trainerId).get()).docs);
-        await Promise.all([trainerRef.delete(), userRef.delete()]);
         await getStorage().bucket().file(`trainers/${trainerId}/cv.pdf`).delete({ ignoreNotFound: true });
         try {
             await getAuth().deleteUser(trainerId);
         } catch (e) {
             if (e.code !== "auth/user-not-found") throw e;
         }
+        await Promise.all([trainerRef.delete(), userRef.delete()]);
         return { ok: true };
     }
 );
