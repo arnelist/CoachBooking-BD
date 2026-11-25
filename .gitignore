@@ -2,3 +2,5 @@
 .env
 .expo/
 node_modules/
+*-debug.log
+todo.md

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, Alert, StyleSheet } from "react-native";
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, StyleSheet } from "react-native";
 import { doc, onSnapshot } from "firebase/firestore";
 import QRCode from "react-native-qrcode-svg";
 import { db } from "../services/firebase";
@@ -79,7 +79,7 @@ export default function TrainerCheckInScreen({ route, navigation }) {
     }
 
     return (
-        <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.container}>
             <Text style={styles.name}>{reservation.clientName}</Text>
             <Text style={styles.muted}>
                 {reservation.date}, {reservation.startTime}–{reservation.endTime}
@@ -105,13 +105,13 @@ export default function TrainerCheckInScreen({ route, navigation }) {
                     <Text style={styles.outlineText}>No-show</Text>
                 </Pressable>
             </View>
-        </View>
+        </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 },
-    container: { flex: 1, alignItems: "center", padding: 24, gap: 8 },
+    container: { flexGrow: 1, alignItems: "center", padding: 24, gap: 8 },
     name: { fontSize: 20, fontWeight: "700", color: "#111827" },
     muted: { color: "#6b7280", textAlign: "center" },
     error: { color: "#dc2626", textAlign: "center" },

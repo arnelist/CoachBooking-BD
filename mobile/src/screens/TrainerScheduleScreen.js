@@ -9,6 +9,7 @@ import { createTimeslot, deleteTimeslot } from "../services/timeslots";
 import { getNextDays, minutesToTime, nowMinutes, timeToMinutes, toDate } from "../utils/dates";
 import { authErrorMessage } from "../utils/authErrors";
 import DayPicker from "../components/DayPicker";
+import { isOnline, OFFLINE_MESSAGE } from "../utils/network";
 
 const DAYS_AHEAD = 7;
 const FIRST_START = 6 * 60;
@@ -103,6 +104,10 @@ export default function TrainerScheduleScreen() {
             setError(`${startTime}–${endTime} overlaps another slot.`);
             return;
         }
+        if (!(await isOnline())) {
+            setError(OFFLINE_MESSAGE);
+            return;
+        }
         setSaving(true);
         try {
             await createTimeslot({
@@ -127,6 +132,10 @@ export default function TrainerScheduleScreen() {
                 text: "Delete",
                 style: "destructive",
                 onPress: async () => {
+                    if (!(await isOnline())) {
+                        setError(OFFLINE_MESSAGE);
+                        return;
+                    }
                     try {
                         await deleteTimeslot(slot.id);
                     } catch (e) {

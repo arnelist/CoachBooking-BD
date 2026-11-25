@@ -65,7 +65,7 @@ export default function ClientTrainerScreen ({ route, navigation }) {
     async function handleBook() {
         setBooking(true);
         try {
-            const { reservationId, clientSecret } = await createReservation(selectedSlot.id);
+            const { reservationId, clientSecret } = await createReservation(selectedSlotId);
             setSelectedSlotId(null);
             navigation.navigate("Checkout", { reservationId, clientSecret });
         } catch(e) {

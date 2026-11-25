@@ -9,10 +9,13 @@ const MESSAGES = {
     "unavailable": "Service is currently unavailable. Please try again later.",
 }
 
+//Firebase SDK adds HTTP status to callable errors, e.g. "... [409]"
+const withoutStatus = (message) => message.replace(/\s*\[\d{3}\]$/, "");
+
 export function authErrorMessage(error) {
     if (MESSAGES[error?.code]) return MESSAGES[error.code];
     if (error?.code?.startsWith("functions/") && error.code !== "functions/internal") {
-        return error.message;
+        return withoutStatus(error.message);
     }
     return "Something went wrong. Check your internet connection and try again.";
 }

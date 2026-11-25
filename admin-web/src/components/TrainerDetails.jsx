@@ -69,7 +69,7 @@ export default function TrainerDetails({ trainer, locations, onClose }) {
             return true;
         } catch (e) {
             const readable = e.code?.startsWith("functions/") && e.code !== "functions/internal";
-            setError(readable ? e.message : `Something went wrong (${e.code}).`)
+            setError(readable ? e.message.replace(/\s*\[\d{3}\]$/, "") : `Something went wrong (${e.code}).`)
             return false;
         } finally {
             setSaving(false);

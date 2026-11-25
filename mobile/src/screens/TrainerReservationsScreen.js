@@ -138,9 +138,10 @@ const styles = StyleSheet.create({
     },
     title: { fontSize: 16, fontWeight: "700", color: "#111827" },
     subtitle: { color: "#6b7280" },
-    actions: { flexDirection: "row", gap: 8, marginTop: 4 },
+    actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
     outline: {
-        flex: 1,
+        flexGrow: 1,
+        minWidth: 100,
         borderWidth: 1,
         borderColor: "#111827",
         borderRadius: 8,

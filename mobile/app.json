@@ -2,6 +2,7 @@
   "expo": {
     "name": "CoachBooking",
     "slug": "coachbooking",
+    "scheme": "coachbooking",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
